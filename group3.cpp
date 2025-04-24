@@ -16,9 +16,6 @@ Adafruit_GPS GPS(&Serial1);
 // IMU
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
 
-// SD card chip select
-#define SD_CS BUILTIN_SDCARD
-
 // Gravity vector
 float gravityX = 0, gravityY = 0, gravityZ = 0;
 unsigned long startTime;
@@ -26,28 +23,34 @@ unsigned long startTime;
 void setup() {
   Serial.begin(9600);
   delay(1000);
-  Serial.println("Setup started...");
+  Serial.println("System initialization started...");
 
-  // Bluetooth
+  // Initialize Bluetooth
   hc05.begin(9600);
 
-  // GPS
-  Serial.println("Initializing GPS...");
+  // Initialize GPS
+  Serial.println("Starting GPS...");
   GPS.begin(9600);
-  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);  // basic location data
-  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);     // 1 Hz update rate
+  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
   GPS.sendCommand(PGCMD_ANTENNA);
 
-  // SD Card
-  if (!SD.begin(SD_CS)) {
+  // Initialize SD Card
+  if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD card initialization failed!");
   } else {
-    Serial.println("SD card initialized.");
+    Serial.println("SD card ready.");
+    // Create CSV header
+    File dataFile = SD.open("data.csv", FILE_WRITE);
+    if (dataFile) {
+      dataFile.println("Time(s),AccelX,AccelY,AccelZ,Latitude,Longitude,Altitude,Satellites");
+      dataFile.close();
+    }
   }
 
-  // IMU
+  // Initialize IMU
   if (!bno.begin()) {
-    Serial.println("Failed to initialize BNO055!");
+    Serial.println("BNO055 IMU not detected!");
     while (1);
   }
 
@@ -71,67 +74,87 @@ void calculateGravity() {
   gravityZ = sumZ / 100;
 }
 
-void writeSensorData(File &dataFile, unsigned long elapsedTime, float linearAccelX, float linearAccelY, float linearAccelZ) {
-  dataFile.print("Time: ");
-  dataFile.print(elapsedTime / 1000);
-  dataFile.print(" s, Accel X: ");
+void writeSensorData(File &dataFile, unsigned long elapsedTime, 
+                    float linearAccelX, float linearAccelY, float linearAccelZ,
+                    float lat, float lon, float alt, int sats) {
+  // Time in seconds with 2 decimal places
+  dataFile.print(elapsedTime / 1000.0, 2);
+  dataFile.print(",");
+  
+  // Acceleration data
   dataFile.print(linearAccelX, 2);
-  dataFile.print(", Y: ");
+  dataFile.print(",");
   dataFile.print(linearAccelY, 2);
-  dataFile.print(", Z: ");
-  dataFile.println(linearAccelZ, 2);
+  dataFile.print(",");
+  dataFile.print(linearAccelZ, 2);
+  dataFile.print(",");
+  
+  // GPS data
+  dataFile.print(lat, 6);
+  dataFile.print(",");
+  dataFile.print(lon, 6);
+  dataFile.print(",");
+  dataFile.print(alt, 2);
+  dataFile.print(",");
+  dataFile.println(sats);
 }
 
 void loop() {
   unsigned long elapsedTime = millis() - startTime;
+  float latitude = 0.0, longitude = 0.0, altitude = 0.0;
+  int satellites = 0;
 
-  // Read IMU
+  // Read IMU data
   sensors_event_t event;
   bno.getEvent(&event);
   float linearAccelX = event.acceleration.x - gravityX;
   float linearAccelY = event.acceleration.y - gravityY;
   float linearAccelZ = event.acceleration.z - gravityZ;
 
-  // Save to SD
-  File dataFile = SD.open("Data.txt", FILE_WRITE);
-  if (dataFile) {
-    writeSensorData(dataFile, elapsedTime, linearAccelX, linearAccelY, linearAccelZ);
-    dataFile.close();
-  } else {
-    Serial.println("Failed to open Data.txt for writing!");
-  }
-
-  // Read GPS
+  // Process GPS data
   GPS.read();
   if (GPS.newNMEAreceived()) {
-    if (!GPS.parse(GPS.lastNMEA())) return;
+    GPS.parse(GPS.lastNMEA());
   }
 
   if (GPS.fix) {
-    Serial.print("Latitude: "); Serial.println(GPS.latitudeDegrees, 6);
-    Serial.print("Longitude: "); Serial.println(GPS.longitudeDegrees, 6);
-    Serial.print("Altitude: "); Serial.print(GPS.altitude); Serial.println(" m");
-    Serial.print("Satellites: "); Serial.println((int)GPS.satellites);
+    latitude = GPS.latitudeDegrees;
+    longitude = GPS.longitudeDegrees;
+    altitude = GPS.altitude;
+    satellites = GPS.satellites;
 
-    // Send over Bluetooth
-    hc05.print("Latitude: "); hc05.println(GPS.latitudeDegrees, 6);
-    hc05.print("Longitude: "); hc05.println(GPS.longitudeDegrees, 6);
-    hc05.print("Altitude: "); hc05.print(GPS.altitude); hc05.println(" m");
-    hc05.print("Satellites: "); hc05.println((int)GPS.satellites);
-  } else {
-    Serial.println("Waiting for GPS fix...");
+    // Bluetooth transmission
+    hc05.print("POS|");
+    hc05.print(latitude, 6);
+    hc05.print("|");
+    hc05.print(longitude, 6);
+    hc05.print("|");
+    hc05.println(altitude, 2);
   }
 
-  // IMU to Serial and Bluetooth
-  Serial.println("IMU Data:");
-  Serial.print("Accel X: "); Serial.print(linearAccelX, 2);
-  Serial.print(", Y: "); Serial.print(linearAccelY, 2);
-  Serial.print(", Z: "); Serial.println(linearAccelZ, 2);
+  // Save all data to SD card
+  File dataFile = SD.open("data.csv", FILE_WRITE);
+  if (dataFile) {
+    writeSensorData(dataFile, elapsedTime, 
+                   linearAccelX, linearAccelY, linearAccelZ,
+                   latitude, longitude, altitude, satellites);
+    dataFile.close();
+    Serial.println("Data logged successfully");
+  } else {
+    Serial.println("Error opening data.csv");
+  }
 
-  hc05.println("IMU Data:");
-  hc05.print("Accel X: "); hc05.print(linearAccelX, 2);
-  hc05.print(", Y: "); hc05.print(linearAccelY, 2);
-  hc05.print(", Z: "); hc05.println(linearAccelZ, 2);
+  // Serial monitor output
+  Serial.print("Accel: ");
+  Serial.print(linearAccelX, 2);
+  Serial.print(", ");
+  Serial.print(linearAccelY, 2);
+  Serial.print(", ");
+  Serial.print(linearAccelZ, 2);
+  Serial.print(" | GPS: ");
+  Serial.print(latitude, 6);
+  Serial.print(", ");
+  Serial.println(longitude, 6);
 
-  delay(1000);
+  delay(1000);  // Adjust sampling rate as needed
 }
