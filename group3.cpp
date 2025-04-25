@@ -6,9 +6,7 @@
 #include <SoftwareSerial.h>
 
 // HC-05 Bluetooth
-#define HC05_RX 34
-#define HC05_TX 35
-SoftwareSerial hc05(HC05_RX, HC05_TX);
+#define BT Serial2
 
 // GPS via hardware Serial1 (Teensy 4.1)
 Adafruit_GPS GPS(&Serial1);
@@ -27,7 +25,7 @@ void setup() {
   Serial.println("System initialization started...");
 
   // Initialize Bluetooth
-  hc05.begin(9600);
+  BT.begin(9600);
 
   // Initialize GPS
   Serial.println("Starting GPS...");
@@ -138,12 +136,12 @@ void loop() {
     satellites = GPS.satellites;
 
     // Bluetooth transmission
-    hc05.print("POS|");
-    hc05.print(latitude, 6);
-    hc05.print("|");
-    hc05.print(longitude, 6);
-    hc05.print("|");
-    hc05.println(altitude, 2);
+    BT.print("POS|");
+    BT.print(latitude, 6);
+    BT.print("|");
+    BT.print(longitude, 6);
+    BT.print("|");
+    BT.println(altitude, 2);
   }
 
   // Save all data to SD card
@@ -169,16 +167,16 @@ Serial.println("IMU Data:");
   Serial.print(", Y: "); Serial.print(velY, 2);
   Serial.print(", Z: "); Serial.println(velZ, 2);
 
-  hc05.println("IMU Data:");
-  hc05.print("Accel X: "); hc05.print(linearAccelX, 2);
-  hc05.print(", Y: "); hc05.print(linearAccelY, 2);
-  hc05.print(", Z: "); hc05.println(linearAccelZ, 2);
-  hc05.print("Magnetic X: "); hc05.print(magX, 2);
-  hc05.print(", Y: "); hc05.print(magY, 2);
-  hc05.print(", Z: "); hc05.println(magZ, 2);
-  hc05.print("Velocity X: "); hc05.print(velX, 2);
-  hc05.print(", Y: "); hc05.print(velY, 2);
-  hc05.print(", Z: "); hc05.println(velZ, 2);
+  BT.println("IMU Data:");
+  BT.print("Accel X: "); BT.print(linearAccelX, 2);
+  BT.print(", Y: "); BT.print(linearAccelY, 2);
+  BT.print(", Z: "); BT.println(linearAccelZ, 2);
+  BT.print("Magnetic X: "); BT.print(magX, 2);
+  BT.print(", Y: "); BT.print(magY, 2);
+  BT.print(", Z: "); BT.println(magZ, 2);
+  BT.print("Velocity X: "); BT.print(velX, 2);
+  BT.print(", Y: "); BT.print(velY, 2);
+  BT.print(", Z: "); BT.println(velZ, 2);
 
   delay(1000);  // Adjust sampling rate as needed
 }
