@@ -18,7 +18,7 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55);
 
 // Gravity vector
 float gravityX = 0, gravityY = 0, gravityZ = 0;
-unsigned long startTime;
+unsigned long startTime, t1, t2, tDel;
 void calculateGravity();
 
 void setup() {
@@ -107,12 +107,23 @@ void loop() {
   float latitude = 0.0, longitude = 0.0, altitude = 0.0;
   int satellites = 0;
 
+  
+
   // Read IMU data
   sensors_event_t event;
   bno.getEvent(&event);
-  float linearAccelX = event.acceleration.x - gravityX;
-  float linearAccelY = event.acceleration.y - gravityY;
-  float linearAccelZ = event.acceleration.z - gravityZ;
+  unsigned long t1 = elapsedTime;
+  float linearAccelX = event.acceleration.x;
+  float linearAccelY = event.acceleration.y;
+  float linearAccelZ = event.acceleration.z;
+  unsigned long t2 = elapsedTime;
+  unsigned long tDel = t2 - t1;
+  float magX = event.magnetic.x;
+  float magY = event.magnetic.y;
+  float magZ = event.magnetic.z;
+  float velX = linearAccelX * tDel;
+  float velY = linearAccelY * tDel;
+  float velZ = linearAccelZ * tDel;
 
   // Process GPS data
   GPS.read();
@@ -132,7 +143,7 @@ void loop() {
     hc05.print("|");
     hc05.print(longitude, 6);
     hc05.print("|");
-    hc05.println(altitude,s 2);
+    hc05.println(altitude, 2);
   }
 
   // Save all data to SD card
@@ -147,16 +158,27 @@ void loop() {
   }
 
   // Serial monitor output
-  Serial.print("Accel: ");
-  Serial.print(linearAccelX, 2);
-  Serial.print(", ");
-  Serial.print(linearAccelY, 2);
-  Serial.print(", ");
-  Serial.print(linearAccelZ, 2);
-  Serial.print(" | GPS: ");
-  Serial.print(latitude, 6);
-  Serial.print(", ");
-  Serial.println(longitude, 6);
+Serial.println("IMU Data:");
+  Serial.print("Accel X: "); Serial.print(linearAccelX, 2);
+  Serial.print(", Y: "); Serial.print(linearAccelY, 2);
+  Serial.print(", Z: "); Serial.println(linearAccelZ, 2);
+  Serial.print("Magnetic X: "); Serial.print(magX, 2);
+  Serial.print(", Y: "); Serial.print(magY, 2);
+  Serial.print(", Z: "); Serial.println(magZ, 2);
+  Serial.print("Velocity X: "); Serial.print(velX, 2);
+  Serial.print(", Y: "); Serial.print(velY, 2);
+  Serial.print(", Z: "); Serial.println(velZ, 2);
+
+  hc05.println("IMU Data:");
+  hc05.print("Accel X: "); hc05.print(linearAccelX, 2);
+  hc05.print(", Y: "); hc05.print(linearAccelY, 2);
+  hc05.print(", Z: "); hc05.println(linearAccelZ, 2);
+  hc05.print("Magnetic X: "); hc05.print(magX, 2);
+  hc05.print(", Y: "); hc05.print(magY, 2);
+  hc05.print(", Z: "); hc05.println(magZ, 2);
+  hc05.print("Velocity X: "); hc05.print(velX, 2);
+  hc05.print(", Y: "); hc05.print(velY, 2);
+  hc05.print(", Z: "); hc05.println(velZ, 2);
 
   delay(1000);  // Adjust sampling rate as needed
 }
