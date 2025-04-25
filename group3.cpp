@@ -19,6 +19,7 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55);
 // Gravity vector
 float gravityX = 0, gravityY = 0, gravityZ = 0;
 unsigned long startTime;
+void calculateGravity();
 
 void setup() {
   Serial.begin(9600);
@@ -43,7 +44,7 @@ void setup() {
     // Create CSV header
     File dataFile = SD.open("data.csv", FILE_WRITE);
     if (dataFile) {
-      dataFile.println("Time(s),AccelX,AccelY,AccelZ,Latitude,Longitude,Altitude,Satellites");
+      dataFile.println("Time(s), Satellites, Latitude, Longitude, Elevation MSL (m), X Accel (m/s^2), Y Accel (m/s^2), Z Accel (m/s^2), X Mag (uT), Y Mag (uT), Z Mag (uT), X Gyro (rps), Y Gyro (rps), Z Gyro (rps)");
       dataFile.close();
     }
   }
@@ -74,11 +75,20 @@ void calculateGravity() {
   gravityZ = sumZ / 100;
 }
 
-void writeSensorData(File &dataFile, unsigned long elapsedTime, 
-                    float linearAccelX, float linearAccelY, float linearAccelZ,
-                    float lat, float lon, float alt, int sats) {
+void writeSensorData(File &dataFile, unsigned long elapsedTime, int sats,
+                    float lat, float lon, float alt, float linearAccelX, 
+                    float linearAccelY, float linearAccelZ) {
   // Time in seconds with 2 decimal places
   dataFile.print(elapsedTime / 1000.0, 2);
+  dataFile.print(",");
+
+  dataFile.println(sats);
+  dataFile.print(",");
+  dataFile.print(lat, 6);
+  dataFile.print(",");
+  dataFile.print(lon, 6);
+  dataFile.print(",");
+  dataFile.print(alt, 2);
   dataFile.print(",");
   
   // Acceleration data
@@ -87,16 +97,9 @@ void writeSensorData(File &dataFile, unsigned long elapsedTime,
   dataFile.print(linearAccelY, 2);
   dataFile.print(",");
   dataFile.print(linearAccelZ, 2);
-  dataFile.print(",");
+  // dataFile.print(",");
   
   // GPS data
-  dataFile.print(lat, 6);
-  dataFile.print(",");
-  dataFile.print(lon, 6);
-  dataFile.print(",");
-  dataFile.print(alt, 2);
-  dataFile.print(",");
-  dataFile.println(sats);
 }
 
 void loop() {
@@ -129,15 +132,14 @@ void loop() {
     hc05.print("|");
     hc05.print(longitude, 6);
     hc05.print("|");
-    hc05.println(altitude, 2);
+    hc05.println(altitude,s 2);
   }
 
   // Save all data to SD card
   File dataFile = SD.open("data.csv", FILE_WRITE);
   if (dataFile) {
-    writeSensorData(dataFile, elapsedTime, 
-                   linearAccelX, linearAccelY, linearAccelZ,
-                   latitude, longitude, altitude, satellites);
+    writeSensorData(dataFile, elapsedTime, satellites, latitude, longitude,
+                    altitude, linearAccelX, linearAccelY, linearAccelZ);
     dataFile.close();
     Serial.println("Data logged successfully");
   } else {
