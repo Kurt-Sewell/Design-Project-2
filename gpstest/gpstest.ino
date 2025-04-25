@@ -1,202 +1,170 @@
-// ECEN 4013, Project 2
-// Final Program
 #include <SD.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-#include <Adafruit_LSM9DS1.h>
-#include <TinyGPS++.h>
+#include <Adafruit_BNO055.h>
+#include <Adafruit_GPS.h>
 #include <SoftwareSerial.h>
 
-TinyGPSPlus gps;
+// HC-05 Bluetooth
+#define HC05_RX 34
+#define HC05_TX 35
+SoftwareSerial hc05(HC05_RX, HC05_TX);
 
-#define HC06_RX 34 // Teensy Pin RX2
-#define HC06_TX 35 // Teensy Pin TX2
-#define RX1_PIN 0 // Teensy RX1 (connect to GPS TX)
-#define TX1_PIN 1 // Teensy TX1 (connect to GPS RX)
-// LSM9DS1 object
-// Initialize a serial connection for HC-06
-SoftwareSerial hc06(HC06_RX, HC06_TX);
-Adafruit_LSM9DS1 lsm = Adafruit_LSM9DS1();
-HardwareSerial &gpsSerial = Serial1; // Use Serial1 for Teensy hardware serial
+// GPS via hardware Serial1 (Teensy 4.1)
+HardwareSerial &GPSPointer = Serial4;
+Adafruit_GPS GPS(&Serial4);
 
-24
+// IMU
+Adafruit_BNO055 bno = Adafruit_BNO055(55);
 
-// SD card chip select pin
+// SD card chip select
 #define SD_CS BUILTIN_SDCARD
-// Gravity calibration variables
+
+// Gravity vector
 float gravityX = 0, gravityY = 0, gravityZ = 0;
-// Timer variable
-unsigned long startTime;
+unsigned long startTime, t1, t2, tDel;
+
+// Velocity vector
+float velocX = 0, velocY = 0, velocZ = 0;
+
 void setup() {
-Serial.begin(9600); // USB Serial
-Serial.println("Initializing GPS...");
-gpsSerial.begin(9600);
-hc06.begin(9600);
-Serial.println("Setup started...");
-// Initialize SD card
-if (!SD.begin(SD_CS)) {
-Serial.println("SD card initialization failed!");
-}
-Serial.println("SD card initialized");
-// Initialize LSM9DS1 sensor
-if (!lsm.begin()) {
-Serial.println("Failed to initialize LSM9DS1!");
-while (1);
-}
-lsm.setupAccel(lsm.LSM9DS1_ACCELRANGE_2G);
-lsm.setupMag(lsm.LSM9DS1_MAGGAIN_4GAUSS);
-lsm.setupGyro(lsm.LSM9DS1_GYROSCALE_245DPS);
-// Calculate gravity vector
-calculateGravity();
-// Start timer
-startTime = millis();
+  Serial.begin(9600);
+  delay(1000);
+  //Serial.println("Setup started...");
 
-25
+  // Bluetooth
+  hc05.begin(9600);
 
+  // GPS
+ // Serial.println("Initializing GPS...");
+  GPSPointer.begin(9600);
+  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);  // basic location data
+  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);     // 1 Hz update rate
+  GPS.sendCommand(PGCMD_ANTENNA);
+
+  // SD Card
+  if (!SD.begin(SD_CS)) {
+    //Serial.println("SD card initialization failed!");
+  } else {
+    //Serial.println("SD card initialized.");
+  }
+
+  // IMU
+  if (!bno.begin()) {
+    //Serial.println("Failed to initialize BNO055!");
+    while (1);
+  }
+
+  // Calibrate gravity vector
+  calculateGravity();
+  startTime = millis();
 }
+
 void calculateGravity() {
-float sumX = 0, sumY = 0, sumZ = 0;
-int samples = 100;
-for (int i = 0; i < samples; i++) {
-sensors_event_t accel, mag, gyro, temp;
-lsm.getEvent(&accel, &mag, &gyro, &temp);
-sumX += accel.acceleration.x;
-sumY += accel.acceleration.y;
-sumZ += accel.acceleration.z;
-delay(10);
-}
-gravityX = sumX / samples;
-gravityY = sumY / samples;
-gravityZ = sumZ / samples;
+  float sumX = 0, sumY = 0, sumZ = 0;
+  sensors_event_t event;
+  for (int i = 0; i < 100; i++) {
+    bno.getEvent(&event);
+    sumX += event.acceleration.x;
+    sumY += event.acceleration.y;
+    sumZ += event.acceleration.z;
+    delay(10);
+  }
+  gravityX = sumX / 100;
+  gravityY = sumY / 100;
+  gravityZ = sumZ / 100;
 }
 
 void writeSensorData(File &dataFile, unsigned long elapsedTime, float linearAccelX, float linearAccelY, float linearAccelZ) {
-dataFile.print("Time: ");
-dataFile.print(elapsedTime / 1000);
-dataFile.print(" s, Accel X: ");
-dataFile.print(linearAccelX, 2);
-dataFile.print(", Y: ");
-dataFile.print(linearAccelY, 2);
-dataFile.print(", Z: ");
-dataFile.print(linearAccelZ, 2);
-dataFile.println();
+  dataFile.print("Time: ");
+  dataFile.print(elapsedTime / 1000);
+  dataFile.print(" s, Accel X: ");
+  dataFile.print(linearAccelX, 2);
+  dataFile.print(", Y: ");
+  dataFile.print(linearAccelY, 2);
+  dataFile.print(", Z: ");
+  dataFile.println(linearAccelZ, 2);
 }
+
+void getInterval(){
+  t1 = millis();
+  delay(50);
+  tDel =  millis() - t1;
+}
+
+
 void loop() {
-unsigned long elapsedTime = millis() - startTime;
-Serial.println("Retrieving IMU Data");
+  unsigned long elapsedTime = millis() - startTime;
+  getInterval();
 
-26
+  // Read IMU
+  sensors_event_t event;
+  bno.getEvent(&event);
+  unsigned long t1 = elapsedTime;
+  float linearAccelX = event.acceleration.x - gravityX;
+  float linearAccelY = event.acceleration.y - gravityY;
+  float linearAccelZ = event.acceleration.z - gravityZ;
+  unsigned long t2 = elapsedTime;
+  unsigned long tDel = t2 - t1;
+  float magX = event.magnetic.x;
+  float magY = event.magnetic.y;
+  float magZ = event.magnetic.z;
+  float velX = linearAccelX * tDel;
+  float velY = linearAccelY * tDel;
+  float velZ = linearAccelZ * tDel;
 
-// Read accelerometer data
-sensors_event_t accel, mag, gyro, temp;
-lsm.getEvent(&accel, &mag, &gyro, &temp);
-// Calculate linear acceleration
-float linearAccelX = accel.acceleration.x - gravityX;
-float linearAccelY = accel.acceleration.y - gravityY;
-float linearAccelZ = accel.acceleration.z - gravityZ;
-delay(1000);
-// Open SD card file
-File dataFile = SD.open("Data.txt", FILE_WRITE);
-if (dataFile) {
-// Write accelerometer data
-Serial.println("Printing IMU data to SD Card");
-writeSensorData(dataFile, elapsedTime, linearAccelX, linearAccelY, linearAccelZ);
-// Close the file
-dataFile.close();
-} else {
-Serial.println("Failed to open Data.txt for writing!");
-}
-Serial.println("Beginning 10-Second GPS Delay");
-delay(10000); // 10-Second delay to accomodate for GPS
-if (gpsSerial.available() > 0) {
-char c = gpsSerial.read();
-gps.encode(c); // Send character to TinyGPS++ parser
-if (gps.location.isUpdated()) {
-Serial.print("Latitude: ");
-Serial.println(gps.location.lat(), 6);
-Serial.print("Longitude: ");
-Serial.println(gps.location.lng(), 6);
-}
-// If GPS has valid altitude data, print it
-if (gps.altitude.isUpdated()) {
-Serial.print("Elevation: ");
-Serial.print(gps.altitude.meters());
+  // Save to SD
+  File dataFile = SD.open("Data.txt", FILE_WRITE);
+  if (dataFile) {
+    writeSensorData(dataFile, elapsedTime, linearAccelX, linearAccelY, linearAccelZ);
+    dataFile.close();
+  } else {
+    Serial.println("Failed to open Data.txt for writing!");
+  }
 
-27
+  // Read GPS
+  GPS.read();
+  if (GPS.newNMEAreceived()) {
+    if (!GPS.parse(GPS.lastNMEA())) return;
+  }
 
-Serial.println(" meters");
-}
-// If GPS has valid satellite count, print it
-if (gps.satellites.isUpdated()) {
-Serial.print("Satellites: ");
-Serial.println(gps.satellites.value());
-}
-}
-else {
-Serial.println("GPS Data Currently Unavailable");
-}
+  if (GPS.fix) {
+    Serial.print("Latitude: "); Serial.println(GPS.latitudeDegrees, 6);
+    Serial.print("Longitude: "); Serial.println(GPS.longitudeDegrees, 6);
+    Serial.print("Altitude: "); Serial.print(GPS.altitude); Serial.println(" m");
+    Serial.print("Satellites: "); Serial.println((int)GPS.satellites);
 
-Serial.println("Procedure Complete, Restarting...");
+    // Send over Bluetooth
+    hc05.print("Latitude: "); hc05.println(GPS.latitudeDegrees, 6);
+    hc05.print("Longitude: "); hc05.println(GPS.longitudeDegrees, 6);
+    hc05.print("Altitude: "); hc05.print(GPS.altitude); hc05.println(" m");
+    hc05.print("Satellites: "); hc05.println((int)GPS.satellites);
+  } else {
+    Serial.println("Waiting for GPS lock...");
+  }
 
-Serial.print("Latitude: ");
-Serial.println(gps.location.lat(), 6);
-Serial.print("Longitude: ");
-Serial.println(gps.location.lng(), 6);
-Serial.print("Elevation: ");
-Serial.print(gps.altitude.meters());
-Serial.println(" meters");
-Serial.print("Satellites: ");
-Serial.println(gps.satellites.value());
+  // IMU to Serial and Bluetooth
+  Serial.println("IMU Data:");
+  Serial.print("Accel X: "); Serial.print(linearAccelX, 2);
+  Serial.print(", Y: "); Serial.print(linearAccelY, 2);
+  Serial.print(", Z: "); Serial.println(linearAccelZ, 2);
+  Serial.print("Magnetic X: "); Serial.print(magX, 2);
+  Serial.print(", Y: "); Serial.print(magY, 2);
+  Serial.print(", Z: "); Serial.println(magZ, 2);
+  Serial.print("Velocity X: "); Serial.print(velX, 2);
+  Serial.print(", Y: "); Serial.print(velY, 2);
+  Serial.print(", Z: "); Serial.println(velZ, 2);
 
-hc06.print("Latitude: ");
-hc06.println(gps.location.lat(), 6);
-hc06.print("Longitude: ");
-hc06.println(gps.location.lng(), 6);
-hc06.print("Elevation: ");
-hc06.print(gps.altitude.meters());
-hc06.println(" meters");
-hc06.print("Satellites: ");
-hc06.println(gps.satellites.value());
+  hc05.println("IMU Data:");
+  hc05.print("Accel X: "); hc05.print(linearAccelX, 2);
+  hc05.print(", Y: "); hc05.print(linearAccelY, 2);
+  hc05.print(", Z: "); hc05.println(linearAccelZ, 2);
+  hc05.print("Magnetic X: "); hc05.print(magX, 2);
+  hc05.print(", Y: "); hc05.print(magY, 2);
+  hc05.print(", Z: "); hc05.println(magZ, 2);
+  hc05.print("Velocity X: "); hc05.print(velX, 2);
+  hc05.print(", Y: "); hc05.print(velY, 2);
+  hc05.print(", Z: "); hc05.println(velZ, 2);
 
-Serial.println("Retrieving IMU Data");
-Serial.print("Acceleration X: ");
-Serial.print(linearAccelX, 2);
-Serial.print(", Y: ");
-Serial.print(linearAccelY, 2);
-Serial.print(", Z: ");
-Serial.println(linearAccelZ, 2);
-hc06.println("Retrieving IMU Data");
-hc06.print("Acceleration X: ");
-hc06.print(linearAccelX, 2);
-hc06.print(", Y: ");
-hc06.print(linearAccelY, 2);
-hc06.print(", Z: ");
-hc06.println(linearAccelZ, 2);
-
-Serial.print("Angular Velocity X: ");
-Serial.print(gyro.gyro.x, 2);
-Serial.print(", Y: ");
-Serial.print(gyro.gyro.y, 2);
-Serial.print(", Z: ");
-Serial.println(gyro.gyro.z, 2);
-hc06.print("Angular Velocity X: ");
-hc06.print(gyro.gyro.x, 2);
-hc06.print(", Y: ");
-hc06.print(gyro.gyro.y, 2);
-hc06.print(", Z: ");
-hc06.println(gyro.gyro.z, 2);
-
-Serial.print("Magnetic Field X: ");
-Serial.print(mag.magnetic.x, 2);
-Serial.print(", Y: ");
-Serial.print(mag.magnetic.y, 2);
-Serial.print(", Z: ");
-Serial.println(mag.magnetic.z, 2);
-hc06.print("Magnetic Field X: ");
-hc06.print(mag.magnetic.x, 2);
-hc06.print(", Y: ");
-hc06.print(mag.magnetic.y, 2);
-hc06.print(", Z: ");
-hc06.println(mag.magnetic.z, 2);
-delay(1000); // 1-second loop delay
+  delay(1000);
 }
