@@ -37,19 +37,17 @@ void setup()
   GPS.sendCommand(PGCMD_ANTENNA);
 
   // Initialize SD Card
-  if (!SD.begin(BUILTIN_SDCARD))
-  {
+  if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD card initialization failed!");
-  }
-  else
-  {
+  } else {
     Serial.println("SD card ready.");
-    // Create CSV header
-    File dataFile = SD.open("data.csv", FILE_WRITE);
-    if (dataFile)
-    {
-      dataFile.println("Time(s), Satellites, Latitude, Longitude, Elevation MSL (m), X Accel (m/s^2), Y Accel (m/s^2), Z Accel (m/s^2), X Mag (uT), Y Mag (uT), Z Mag (uT), X Gyro (rps), Y Gyro (rps), Z Gyro (rps)");
-      dataFile.close();
+    // Write header only if file doesn't exist
+    if (!SD.exists("data.csv")) {
+      File dataFile = SD.open("data.csv", FILE_WRITE);
+      if (dataFile) {
+        dataFile.println("Time(s),Satellites,Latitude,Longitude,Elevation MSL (m),X Accel (m/s^2),Y Accel (m/s^2),Z Accel (m/s^2),X Mag (uT),Y Mag (uT),Z Mag (uT),X Gyro (rps),Y Gyro (rps),Z Gyro (rps)");
+        dataFile.close();
+      }
     }
   }
 
@@ -186,17 +184,13 @@ void loop()
 
   // Save all data to SD card
   File dataFile = SD.open("data.csv", FILE_WRITE);
-  if (dataFile)
-  {
+  if (dataFile) {
     writeSensorData(dataFile, elapsedTime, satellites, latitude, longitude,
-                    altitude, linearAccelX, linearAccelY, linearAccelZ, magX, 
-                    magY, magZ, gyrox, gyroy, gyroz);
+                    altitude, linearAccelX, linearAccelY, linearAccelZ,
+                    magX, magY, magZ, gyrox, gyroy, gyroz);
     dataFile.close();
-    Serial.println("Data logged successfully");
-  }
-  else
-  {
-    Serial.println("Error opening data.csv");
+  } else {
+    Serial.println("Error opening file");
   }
 
   Serial.println("GPS Data:");
