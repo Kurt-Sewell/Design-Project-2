@@ -9,7 +9,7 @@
 #define BT Serial6
 
 // GPS via hardware Serial1 (Teensy 4.1)
-Adafruit_GPS GPS(&Serial1);
+Adafruit_GPS GPS(&Serial4);
 
 // IMU
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
@@ -17,9 +17,10 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55);
 // Gravity vector
 float gravityX = 0, gravityY = 0, gravityZ = 0;
 unsigned long startTime, t1, t2, tDel;
-void calculateGravity();
+// void calculateGravity();
 
-void setup() {
+void setup()
+{
   Serial.begin(9600);
   delay(1000);
   Serial.println("System initialization started...");
@@ -35,22 +36,28 @@ void setup() {
   GPS.sendCommand(PGCMD_ANTENNA);
 
   // Initialize SD Card
-  if (!SD.begin(BUILTIN_SDCARD)) {
+  if (!SD.begin(BUILTIN_SDCARD))
+  {
     Serial.println("SD card initialization failed!");
-  } else {
+  }
+  else
+  {
     Serial.println("SD card ready.");
     // Create CSV header
     File dataFile = SD.open("data.csv", FILE_WRITE);
-    if (dataFile) {
+    if (dataFile)
+    {
       dataFile.println("Time(s), Satellites, Latitude, Longitude, Elevation MSL (m), X Accel (m/s^2), Y Accel (m/s^2), Z Accel (m/s^2), X Mag (uT), Y Mag (uT), Z Mag (uT), X Gyro (rps), Y Gyro (rps), Z Gyro (rps)");
       dataFile.close();
     }
   }
 
   // Initialize IMU
-  if (!bno.begin()) {
+  if (!bno.begin())
+  {
     Serial.println("BNO055 IMU not detected!");
-    while (1);
+    while (1)
+      ;
   }
 
   // Calibrate gravity vector
@@ -58,10 +65,12 @@ void setup() {
   startTime = millis();
 }
 
-void calculateGravity() {
+void calculateGravity()
+{
   float sumX = 0, sumY = 0, sumZ = 0;
   sensors_event_t event;
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < 100; i++)
+  {
     bno.getEvent(&event);
     sumX += event.acceleration.x;
     sumY += event.acceleration.y;
@@ -74,8 +83,9 @@ void calculateGravity() {
 }
 
 void writeSensorData(File &dataFile, unsigned long elapsedTime, int sats,
-                    float lat, float lon, float alt, float linearAccelX, 
-                    float linearAccelY, float linearAccelZ) {
+                     float lat, float lon, float alt, float linearAccelX,
+                     float linearAccelY, float linearAccelZ)
+{
   // Time in seconds with 2 decimal places
   dataFile.print(elapsedTime / 1000.0, 2);
   dataFile.print(",");
@@ -88,7 +98,7 @@ void writeSensorData(File &dataFile, unsigned long elapsedTime, int sats,
   dataFile.print(",");
   dataFile.print(alt, 2);
   dataFile.print(",");
-  
+
   // Acceleration data
   dataFile.print(linearAccelX, 2);
   dataFile.print(",");
@@ -96,16 +106,15 @@ void writeSensorData(File &dataFile, unsigned long elapsedTime, int sats,
   dataFile.print(",");
   dataFile.print(linearAccelZ, 2);
   // dataFile.print(",");
-  
+
   // GPS data
 }
 
-void loop() {
+void loop()
+{
   unsigned long elapsedTime = millis() - startTime;
   float latitude = 0.0, longitude = 0.0, altitude = 0.0;
   int satellites = 0;
-
-  
 
   // Read IMU data
   sensors_event_t event;
@@ -122,14 +131,19 @@ void loop() {
   float velX = linearAccelX * tDel;
   float velY = linearAccelY * tDel;
   float velZ = linearAccelZ * tDel;
+  float gyrox = event.gyro.x;
+  float gyroy = event.gyro.y;
+  float gyroz = event.gyro.z;
 
   // Process GPS data
   GPS.read();
-  if (GPS.newNMEAreceived()) {
+  if (GPS.newNMEAreceived())
+  {
     GPS.parse(GPS.lastNMEA());
   }
 
-  if (GPS.fix) {
+  if (GPS.fix)
+  {
     latitude = GPS.latitudeDegrees;
     longitude = GPS.longitudeDegrees;
     altitude = GPS.altitude;
@@ -146,37 +160,70 @@ void loop() {
 
   // Save all data to SD card
   File dataFile = SD.open("data.csv", FILE_WRITE);
-  if (dataFile) {
+  if (dataFile)
+  {
     writeSensorData(dataFile, elapsedTime, satellites, latitude, longitude,
                     altitude, linearAccelX, linearAccelY, linearAccelZ);
     dataFile.close();
     Serial.println("Data logged successfully");
-  } else {
+  }
+  else
+  {
     Serial.println("Error opening data.csv");
   }
 
   // Serial monitor output
-Serial.println("IMU Data:");
-  Serial.print("Accel X: "); Serial.print(linearAccelX, 2);
-  Serial.print(", Y: "); Serial.print(linearAccelY, 2);
-  Serial.print(", Z: "); Serial.println(linearAccelZ, 2);
-  Serial.print("Magnetic X: "); Serial.print(magX, 2);
-  Serial.print(", Y: "); Serial.print(magY, 2);
-  Serial.print(", Z: "); Serial.println(magZ, 2);
-  Serial.print("Velocity X: "); Serial.print(velX, 2);
-  Serial.print(", Y: "); Serial.print(velY, 2);
-  Serial.print(", Z: "); Serial.println(velZ, 2);
+  Serial.println("IMU Data:");
+  Serial.print("Accel X: ");
+  Serial.print(linearAccelX, 2);
+  Serial.print(", Y: ");
+  Serial.print(linearAccelY, 2);
+  Serial.print(", Z: ");
+  Serial.println(linearAccelZ, 2);
+  Serial.print("Magnetic X: ");
+  Serial.print(magX, 2);
+  Serial.print(", Y: ");
+  Serial.print(magY, 2);
+  Serial.print(", Z: ");
+  Serial.println(magZ, 2);
+  Serial.print("Velocity X: ");
+  Serial.print(velX, 2);
+  Serial.print(", Y: ");
+  Serial.print(velY, 2);
+  Serial.print(", Z: ");
+  Serial.println(velZ, 2);
+  Serial.print("Gyroscope X: ");
+  Serial.print(gyrox, 2);
+  Serial.print(", Y: ");
+  Serial.print(gyroy, 2);
+  Serial.print(", Z: ");
+  Serial.println(gyroz, 2);
 
   BT.println("IMU Data:");
-  BT.print("Accel X: "); BT.print(linearAccelX, 2);
-  BT.print(", Y: "); BT.print(linearAccelY, 2);
-  BT.print(", Z: "); BT.println(linearAccelZ, 2);
-  BT.print("Magnetic X: "); BT.print(magX, 2);
-  BT.print(", Y: "); BT.print(magY, 2);
-  BT.print(", Z: "); BT.println(magZ, 2);
-  BT.print("Velocity X: "); BT.print(velX, 2);
-  BT.print(", Y: "); BT.print(velY, 2);
-  BT.print(", Z: "); BT.println(velZ, 2);
+  BT.print("Accel X: ");
+  BT.print(linearAccelX, 2);
+  BT.print(", Y: ");
+  BT.print(linearAccelY, 2);
+  BT.print(", Z: ");
+  BT.println(linearAccelZ, 2);
+  BT.print("Magnetic X: ");
+  BT.print(magX, 2);
+  BT.print(", Y: ");
+  BT.print(magY, 2);
+  BT.print(", Z: ");
+  BT.println(magZ, 2);
+  BT.print("Velocity X: ");
+  BT.print(velX, 2);
+  BT.print(", Y: ");
+  BT.print(velY, 2);
+  BT.print(", Z: ");
+  BT.println(velZ, 2);
+  BT.print("Gyroscope X: ");
+  BT.print(gyrox, 2);
+  BT.print(", Y: ");
+  BT.print(gyroy, 2);
+  BT.print(", Z: ");
+  BT.println(gyroz, 2);
 
-  delay(1000);  // Adjust sampling rate as needed
+  delay(1000); // Adjust sampling rate as needed
 }
