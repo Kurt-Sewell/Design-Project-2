@@ -196,11 +196,13 @@ void loop()
   Serial.println("GPS Data:");
   Serial.print("Longitude: "); Serial.println(longitude, 2);
   Serial.print("Latitude: "); Serial.println(latitude, 2);
-  Serial.print("Sattelites: "); Serial.println(satellites);
+  Serial.print("Satelites: "); Serial.println(satellites);
 
 
   // Serial monitor output
   Serial.println("IMU Data:");
+  Serial.print("Elevation: ");
+  Serial.println(altitude, 2);
   Serial.print("Accel X: ");
   Serial.print(linearAccelX, 2);
   Serial.print(", Y: ");
@@ -226,7 +228,17 @@ void loop()
   Serial.print(", Z: ");
   Serial.println(gyroz, 2);
 
+  BT.println("GPS Data:");
+  BT.print("Longitude: ");
+  BT.println(longitude, 2);
+  BT.print("Latitude: ");
+  BT.println(latitude, 2);
+  BT.print("Satelites: ");
+  BT.println(satellites, 2);
+
   BT.println("IMU Data:");
+  BT.print("Elevation: ");
+  BT.println(altitude, 2);
   BT.print("Velocity X: ");
   BT.print(velX, 2);
   BT.print(", Y: ");
