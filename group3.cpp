@@ -6,7 +6,7 @@
 #include <SoftwareSerial.h>
 
 // HC-05 Bluetooth
-#define BT Serial2
+#define BT Serial6
 
 // GPS via hardware Serial1 (Teensy 4.1)
 Adafruit_GPS GPS(&Serial1);
