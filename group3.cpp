@@ -10,7 +10,7 @@
 #define BT Serial6
 
 // GPS via hardware Serial1 (Teensy 4.1)
-Adafruit_GPS GPS(&Serial4);
+Adafruit_GPS GPS(&Serial3);
 
 // IMU
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
@@ -200,10 +200,9 @@ void loop()
   }
 
   Serial.println("GPS Data:");
-  Serial.print("Longitude: ");
-  Serial.println(longitude, 2);
-  Serial.print("Latitude: ");
-  Serial.println(latitude, 2);
+  Serial.print("Longitude: "); Serial.println(longitude, 2);
+  Serial.print("Latitude: "); Serial.println(latitude, 2);
+  Serial.print("Sattelites: "); Serial.println(satellites);
 
 
   // Serial monitor output
