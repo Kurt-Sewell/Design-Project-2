@@ -4,6 +4,7 @@
 #include <Adafruit_BNO055.h>
 #include <Adafruit_GPS.h>
 #include <SoftwareSerial.h>
+#include <utility/imumaths.h>
 
 // HC-05 Bluetooth
 #define BT Serial6
@@ -53,12 +54,11 @@ void setup()
   }
 
   // Initialize IMU
-  if (!bno.begin())
-  {
-    Serial.println("BNO055 IMU not detected!");
-    while (1)
-      ;
+  if (!bno.begin()) {
+    Serial.println("BNO055 not found!");
+    while (1);
   }
+  bno.setMode((adafruit_bno055_opmode_t)0x0C);
 
   // Calibrate gravity vector
   calculateGravity();
@@ -84,13 +84,14 @@ void calculateGravity()
 
 void writeSensorData(File &dataFile, unsigned long elapsedTime, int sats,
                      float lat, float lon, float alt, float linearAccelX,
-                     float linearAccelY, float linearAccelZ)
+                     float linearAccelY, float linearAccelZ, float magX, 
+                     float magY, float magZ, float gyrox, float gyroy, float gyroz)
 {
   // Time in seconds with 2 decimal places
   dataFile.print(elapsedTime / 1000.0, 2);
   dataFile.print(",");
 
-  dataFile.println(sats);
+  dataFile.print(sats);
   dataFile.print(",");
   dataFile.print(lat, 6);
   dataFile.print(",");
@@ -105,35 +106,60 @@ void writeSensorData(File &dataFile, unsigned long elapsedTime, int sats,
   dataFile.print(linearAccelY, 2);
   dataFile.print(",");
   dataFile.print(linearAccelZ, 2);
-  // dataFile.print(",");
+  dataFile.print(",");
+  dataFile.print(magX, 2);
+  dataFile.print(",");
+  dataFile.print(magY, 2);
+  dataFile.print(",");
+  dataFile.print(magZ, 2);
+  dataFile.print(",");
+  dataFile.print(gyrox, 2);
+  dataFile.print(",");
+  dataFile.print(gyroy, 2);
+  dataFile.print(",");
+  dataFile.print(gyroz, 2);
+  dataFile.println();
 
   // GPS data
 }
+
+static float velX = 0, velY = 0, velZ = 0;
+static unsigned long lastTime = 0;
 
 void loop()
 {
   unsigned long elapsedTime = millis() - startTime;
   float latitude = 0.0, longitude = 0.0, altitude = 0.0;
   int satellites = 0;
+  sensors_event_t accelEvent, magEvent, gyroEvent;
 
   // Read IMU data
-  sensors_event_t event;
-  bno.getEvent(&event);
-  unsigned long t1 = elapsedTime;
-  float linearAccelX = event.acceleration.x;
-  float linearAccelY = event.acceleration.y;
-  float linearAccelZ = event.acceleration.z;
-  unsigned long t2 = elapsedTime;
-  unsigned long tDel = t2 - t1;
-  float magX = event.magnetic.x;
-  float magY = event.magnetic.y;
-  float magZ = event.magnetic.z;
-  float velX = linearAccelX * tDel;
-  float velY = linearAccelY * tDel;
-  float velZ = linearAccelZ * tDel;
-  float gyrox = event.gyro.x;
-  float gyroy = event.gyro.y;
-  float gyroz = event.gyro.z;
+  bno.getEvent(&accelEvent, Adafruit_BNO055::VECTOR_ACCELEROMETER);
+  bno.getEvent(&magEvent, Adafruit_BNO055::VECTOR_MAGNETOMETER);
+  bno.getEvent(&gyroEvent, Adafruit_BNO055::VECTOR_GYROSCOPE);
+
+  uint8_t sys, gyro, accel, mag;
+  bno.getCalibration(&sys, &gyro, &accel, &mag);
+  delay(500);
+  
+  unsigned long currentTime = millis();
+  float dt = (currentTime - lastTime) / 1000.0;  // convert ms to seconds
+  lastTime = currentTime;
+  float linearAccelX = accelEvent.acceleration.x - gravityX;
+  float linearAccelY = accelEvent.acceleration.y - gravityY;
+  float linearAccelZ = accelEvent.acceleration.z - gravityZ;
+  
+  velX += linearAccelX * dt;
+  velY += linearAccelY * dt;
+  velZ += linearAccelZ * dt;
+  
+  float magX = magEvent.magnetic.x;
+  float magY = magEvent.magnetic.y;
+  float magZ = magEvent.magnetic.z;
+
+  float gyrox = gyroEvent.gyro.x; // In radians per second (rps)
+  float gyroy = gyroEvent.gyro.y;
+  float gyroz = gyroEvent.gyro.z;
 
   // Process GPS data
   GPS.read();
@@ -163,7 +189,8 @@ void loop()
   if (dataFile)
   {
     writeSensorData(dataFile, elapsedTime, satellites, latitude, longitude,
-                    altitude, linearAccelX, linearAccelY, linearAccelZ);
+                    altitude, linearAccelX, linearAccelY, linearAccelZ, magX, 
+                    magY, magZ, gyrox, gyroy, gyroz);
     dataFile.close();
     Serial.println("Data logged successfully");
   }
@@ -171,6 +198,13 @@ void loop()
   {
     Serial.println("Error opening data.csv");
   }
+
+  Serial.println("GPS Data:");
+  Serial.print("Longitude: ");
+  Serial.println(longitude, 2);
+  Serial.print("Latitude: ");
+  Serial.println(latitude, 2);
+
 
   // Serial monitor output
   Serial.println("IMU Data:");
@@ -200,6 +234,12 @@ void loop()
   Serial.println(gyroz, 2);
 
   BT.println("IMU Data:");
+  BT.print("Velocity X: ");
+  BT.print(velX, 2);
+  BT.print(", Y: ");
+  BT.print(velY, 2);
+  BT.print(", Z: ");
+  BT.println(velZ, 2);
   BT.print("Accel X: ");
   BT.print(linearAccelX, 2);
   BT.print(", Y: ");
@@ -212,12 +252,6 @@ void loop()
   BT.print(magY, 2);
   BT.print(", Z: ");
   BT.println(magZ, 2);
-  BT.print("Velocity X: ");
-  BT.print(velX, 2);
-  BT.print(", Y: ");
-  BT.print(velY, 2);
-  BT.print(", Z: ");
-  BT.println(velZ, 2);
   BT.print("Gyroscope X: ");
   BT.print(gyrox, 2);
   BT.print(", Y: ");
