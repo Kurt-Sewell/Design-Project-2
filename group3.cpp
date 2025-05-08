@@ -140,6 +140,15 @@ void loop()
 
   uint8_t sys, gyro, accel, mag;
   bno.getCalibration(&sys, &gyro, &accel, &mag);
+  Serial.print("Calib (SYS,G,A,M): ");
+  Serial.print(sys);
+  Serial.print(", ");
+  Serial.print(gyro);
+  Serial.print(", ");
+  Serial.print(accel);
+  Serial.print(", ");
+  Serial.println(mag);
+
   delay(500);
   
   unsigned long currentTime = millis();

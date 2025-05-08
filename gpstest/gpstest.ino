@@ -112,6 +112,9 @@ void loop() {
   float velX = linearAccelX * tDel;
   float velY = linearAccelY * tDel;
   float velZ = linearAccelZ * tDel;
+  float gyrox = event.gyro.x;
+  float gyroy = event.gyro.y;
+  float gyroz = event.gyro.z;
 
   // Save to SD
   File dataFile = SD.open("Data.txt", FILE_WRITE);
@@ -154,6 +157,10 @@ void loop() {
   Serial.print("Velocity X: "); Serial.print(velX, 2);
   Serial.print(", Y: "); Serial.print(velY, 2);
   Serial.print(", Z: "); Serial.println(velZ, 2);
+  Serial.print("Gyroscope X: "); Serial.print(gyrox, 2);
+  Serial.print(", Y: "); Serial.print(gyroy, 2);
+  Serial.print(", Z: "); Serial.println(gyroz, 2);
+
 
   hc05.println("IMU Data:");
   hc05.print("Accel X: "); hc05.print(linearAccelX, 2);
